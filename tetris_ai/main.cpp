@@ -1356,8 +1356,8 @@ void mainscene() {
                             if (TETRIO_ATTACK_TABLE && cap != -1) {
                                 if (cap < *tetris[i].accept_atts.begin()) {
                                     tetris[i].acceptAttack(cap);
-                                    cap = 0;
                                     *tetris[i].accept_atts.begin() -= cap;
+                                    cap = 0;
                                     break;
                                 }
                                 else {
