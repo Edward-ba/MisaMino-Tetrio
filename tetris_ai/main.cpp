@@ -118,7 +118,7 @@ void tetris_draw_next(const TetrisGame& tetris, PIMAGE* gem) {
     }
 }
 
-void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid) {
+void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid, int garbageCap) {
     static PIMAGE pool_gem[9] = {0}, pool_gem_dark[9] = {0};
     PIMAGE* gem = pool_gem_dark;
     if ( pool_gem[1] == NULL ) {
@@ -260,7 +260,8 @@ void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid) {
             for ( int x = 0; x < tetris.poolw(); ++x) {
                 int y = min_y[x];
                 int bx = int(tetris.m_base.x + tetris.m_size.x * (x + 5));
-                int by = int(base_y + tetris.m_size.y * (y - atts));
+                int cap = (garbageCap == 0) ? INT_MAX : garbageCap;
+                int by = int(base_y + tetris.m_size.y * (y - min(atts,cap)));
                 if ( lastbx != -1 && lastby != by ) {
                     line( lastbx, lastby, bx, by);
                 }
@@ -535,6 +536,7 @@ struct tetris_rule {
     int GarbageCancel;
     int GarbageBuffer;
     int GarbageBlocking;
+    int GarbageCap;
     int combo_table_style;
     int samesequence;
     int turn;
@@ -546,6 +548,7 @@ struct tetris_rule {
         GarbageCancel = 1;
         GarbageBuffer = 1;
         GarbageBlocking = 1;
+        GarbageCap = 0;
         combo_table_style = 0;
         samesequence = 1;
         turn = 1;
@@ -625,6 +628,9 @@ void loadRule(CProfile& config, tetris_rule& rule) {
     }
     if ( config.IsInteger( "GarbageBlocking" ) ) {
         rule.GarbageBlocking = config.ReadInteger( "GarbageBlocking" );
+    }
+    if (config.IsInteger("GarbageCap")) {
+        rule.GarbageCap = config.ReadInteger("GarbageCap");
     }
     if ( config.IsInteger( "samesequence" ) ) {
         rule.samesequence = config.ReadInteger( "samesequence" );
@@ -1344,8 +1350,22 @@ void mainscene() {
                     }
 
                     if ( player_accept_attack && ( rule.GarbageBlocking == 0 || clearLines == 0) ) {
+                        int cap = (rule.GarbageCap == 0)?-1:rule.GarbageCap;
                         while ( ! tetris[i].accept_atts.empty() ) {
-                            if ( rule.garbage == 0 ) {
+                            if (cap == 0) break;
+                            if (TETRIO_ATTACK_TABLE && cap != -1) {
+                                if (cap < *tetris[i].accept_atts.begin()) {
+                                    tetris[i].acceptAttack(cap);
+                                    cap = 0;
+                                    *tetris[i].accept_atts.begin() -= cap;
+                                    break;
+                                }
+                                else {
+                                    cap -= *tetris[i].accept_atts.begin();
+                                    tetris[i].acceptAttack(*tetris[i].accept_atts.begin());
+                                }
+                            }
+                            else if ( rule.garbage == 0 ) {
                                 tetris[i].acceptAttack( *tetris[i].accept_atts.begin() );
                             } else if ( rule.garbage == 1 ) {
                                 for ( int n = *tetris[i].accept_atts.begin(); n > 0; n-= 2 ) {
@@ -1493,7 +1513,7 @@ void mainscene() {
         for (std::vector<TetrisGame>::iterator it = tetris.begin();
             it != tetris.end();
             ++it) {
-                tetris_draw(*it, showAttackLine, showGrid);
+                tetris_draw(*it, showAttackLine, showGrid, rule.GarbageCap);
         }
         //if(0)
         if ( ! PUBLIC_VERSION )
@@ -1563,7 +1583,7 @@ int main () {
 #if PUBLIC_VERSION == 0
     setcaption("Tetris AI Demo");
 #else
-    setcaption("MisaMino V1.4.5 ---- by Misakamm ( misakamm.com )");
+    setcaption("MisaMino V1.4.5 ---- by Misakamm ( misakamm.com ) Tetrio version");
 #endif
     mainscene();
     return 0;
