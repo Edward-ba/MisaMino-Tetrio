@@ -8,6 +8,8 @@
 
 #include "profile.h"
 #include <map>
+#include <list>
+#include <iostream>
 
 int enable_autostart = 0;
 int autostart_interval = 0;
@@ -539,6 +541,7 @@ struct tetris_rule {
     int GarbageBlocking;
     int GarbageCap;
     int DelayedAttackTime;
+    int undoSteps;
     int combo_table_style;
     int samesequence;
     int turn;
@@ -552,6 +555,7 @@ struct tetris_rule {
         GarbageBlocking = 1;
         GarbageCap = 0;
         DelayedAttackTime = 0;
+        undoSteps = 0;
         combo_table_style = 0;
         samesequence = 1;
         turn = 1;
@@ -637,6 +641,9 @@ void loadRule(CProfile& config, tetris_rule& rule) {
     }
     if (config.IsInteger("DelayedAttackTime")) {
         rule.DelayedAttackTime = config.ReadInteger("DelayedAttackTime");
+    }
+    if (config.IsInteger("undoSteps")) {
+        rule.undoSteps = config.ReadInteger("undoSteps");
     }
     if ( config.IsInteger( "samesequence" ) ) {
         rule.samesequence = config.ReadInteger( "samesequence" );
@@ -1117,8 +1124,12 @@ void mainscene() {
         int attack; // number of attack
     };
     std::vector<struct delayed_attack_s> delayed_attack_q;
-
+    std::list<std::vector<TetrisGame>> saved_board_state;
+    bool undo = false;
+    bool harddrop = false;
     for ( ; is_run() ; normal_delay ? delay_fps(60) : delay_ms(0) ) {
+        undo = false;
+        harddrop = false;
         for ( int jf = 0; jf < mainloop_times; ++jf) {
 #ifndef XP_RELEASE
             if ( AI_TRAINING_SLOW == 0 ) {
@@ -1224,6 +1235,7 @@ void mainscene() {
                     }
                     if ( k.key == player_keys[6] && player_key_state[6] == 0 ) {
                         tetris[0].drop();
+                        harddrop = true;
                         //player_key_state[0] = !!player_key_state[0];
                         //player_key_state[1] = !!player_key_state[1];
                         //player_key_state[2] = !!player_key_state[2];
@@ -1245,16 +1257,23 @@ void mainscene() {
                             if (player.sound_bgm) GameSound::ins().loadBGM(rnd);
                         }
                     }
+                    // undo
+                    if (k.key == key_back) {
+                        undo = true;
+                    }
                     if ( k.key == key_f2 ) {
                         if ( !tetris[0].alive() || !tetris[1].alive() || tetris[0].n_pieces <= 20 ) {
                             int seed = (unsigned)time(0), pass = rnd.randint(1024);
+                            saved_board_state.clear();
                             delayed_attack_q.clear();
+                            saved_board_state.push_back({});
                             for ( int i = 0; i < players_num; ++i ) {
                                 tetris[i].reset( seed ^ ((!rule.samesequence) * i * 255), pass );
                                 //tetris[i].reset( (unsigned)time(0) + ::GetTickCount() * i );
                                 onGameStart( tetris[i], rnd, i );
                                 tetris[i].acceptAttack(player_begin_attack);
                                 ++count;
+                                saved_board_state.back().push_back(tetris[i]);
                             }
                             if ( player.sound_bgm ) GameSound::ins().loadBGM( rnd );
                         }
@@ -1448,7 +1467,7 @@ void mainscene() {
                             next.push_back(tetris[i].m_next[j]);
                         double beg = (double)::GetTickCount() / 1000;
                         int deep = ai_search_height_deep;
-                        int upcomeAtt = 0;
+                        int upcomeAtt = 0; // TODO: make AI think with garbage cap
                         for ( int j = 0; j < tetris[i].accept_atts.size(); ++j ) {
                             upcomeAtt += tetris[i].accept_atts[j];
                         }
@@ -1569,10 +1588,27 @@ void mainscene() {
             if ( ! ai_eve ) break;
         }
         cleardevice();
-        for (std::vector<TetrisGame>::iterator it = tetris.begin();
-            it != tetris.end();
-            ++it) {
-                tetris_draw(*it, showAttackLine, showGrid, rule.GarbageCap);
+        // (under turnbase) If a human players harddrop and done calculating garbage, save board state
+        if (rule.undoSteps > 0 && rule.turnbase && harddrop) {
+            //std::cout << "saved" << std::endl;;
+            harddrop = false;
+            while (saved_board_state.size() > rule.undoSteps)
+                saved_board_state.pop_front();
+            saved_board_state.push_back({});
+            for (int k = 0; k < players_num; k++) {
+                saved_board_state.back().push_back(tetris[k]);
+            }
+        }
+        else if (undo && saved_board_state.size() > 1 && rule.turnbase && rule.undoSteps > 0) {
+            lastGameState = 0;
+            saved_board_state.pop_back();
+            auto lastState = saved_board_state.back();
+            for (int k = 0; k < players_num; k++) {
+                tetris[k] = lastState[k];
+            }
+        }
+        for (int i = 0; i < players_num; i++) {
+                tetris_draw(tetris[i], showAttackLine, showGrid, rule.GarbageCap);
         }
         //if(0)
         if ( ! PUBLIC_VERSION )
