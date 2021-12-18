@@ -47,6 +47,15 @@ public:
 
 	explicit mtrandom(uint32 seed) : left(1) {    init(seed);    }
 
+	mtrandom& operator=(const mtrandom& m) {
+		for (int i = 0; i < N; ++i) {
+			state[i] = m.state[i];
+		}
+		left = m.left;
+		next = state + (m.next - m.state);
+		return *this;
+	}
+
 	mtrandom(uint32* init_key, int key_length) : left(1) {
 		int i = 1, j = 0;
 		int k = N > key_length ? N : key_length;

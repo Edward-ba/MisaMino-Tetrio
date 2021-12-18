@@ -1124,12 +1124,11 @@ void mainscene() {
         int attack; // number of attack
     };
     std::vector<struct delayed_attack_s> delayed_attack_q;
-    std::list<std::vector<TetrisGame>> saved_board_state;
+    std::list<TetrisGame> saved_board[2];
+    int saved_board_num[] = { rule.undoSteps, rule.undoSteps + 10 };
     bool undo = false;
-    bool harddrop = false;
     for ( ; is_run() ; normal_delay ? delay_fps(60) : delay_ms(0) ) {
         undo = false;
-        harddrop = false;
         for ( int jf = 0; jf < mainloop_times; ++jf) {
 #ifndef XP_RELEASE
             if ( AI_TRAINING_SLOW == 0 ) {
@@ -1235,7 +1234,6 @@ void mainscene() {
                     }
                     if ( k.key == player_keys[6] && player_key_state[6] == 0 ) {
                         tetris[0].drop();
-                        harddrop = true;
                         //player_key_state[0] = !!player_key_state[0];
                         //player_key_state[1] = !!player_key_state[1];
                         //player_key_state[2] = !!player_key_state[2];
@@ -1264,16 +1262,16 @@ void mainscene() {
                     if ( k.key == key_f2 ) {
                         if ( !tetris[0].alive() || !tetris[1].alive() || tetris[0].n_pieces <= 20 ) {
                             int seed = (unsigned)time(0), pass = rnd.randint(1024);
-                            saved_board_state.clear();
                             delayed_attack_q.clear();
-                            saved_board_state.push_back({});
+                            saved_board[0].clear();
+                            saved_board[1].clear();
                             for ( int i = 0; i < players_num; ++i ) {
                                 tetris[i].reset( seed ^ ((!rule.samesequence) * i * 255), pass );
                                 //tetris[i].reset( (unsigned)time(0) + ::GetTickCount() * i );
                                 onGameStart( tetris[i], rnd, i );
                                 tetris[i].acceptAttack(player_begin_attack);
                                 ++count;
-                                saved_board_state.back().push_back(tetris[i]);
+                                saved_board[i].push_back(tetris[i]);
                             }
                             if ( player.sound_bgm ) GameSound::ins().loadBGM( rnd );
                         }
@@ -1459,6 +1457,12 @@ void mainscene() {
                         }
                     }
                 }
+                // Have to record state before ai start to calculate
+                if (tetris[i].n_pieces > saved_board[i].back().n_pieces) {
+                    while (saved_board[i].size() > saved_board_num[i])
+                        saved_board[i].pop_front();
+                    saved_board[i].push_back(tetris[i]);
+                }
                 if ( tetris[i].env_change && tetris[i].ai_movs_flag == -1) { // AI ¼ÆËã
                     if ( (ai_eve || ai[i].style) && tetris[i].alive() ) {
                     //if ( i != 0 && tetris[i].alive() ) {
@@ -1481,7 +1485,6 @@ void mainscene() {
                             }
                         }
                         bool canhold = tetris[i].hold;
-
                         if ( tetris[i].pTetrisAI ) {
                             AI::RunAIDll(tetris[i].pTetrisAI, tetris[i].ai_movs, tetris[i].ai_movs_flag, tetris[i].m_ai_param, tetris[i].m_pool, tetris[i].m_hold,
                                 tetris[i].m_cur,
@@ -1588,23 +1591,17 @@ void mainscene() {
             if ( ! ai_eve ) break;
         }
         cleardevice();
-        // (under turnbase) If a human players harddrop and done calculating garbage, save board state
-        if (rule.undoSteps > 0 && rule.turnbase && harddrop) {
-            //std::cout << "saved" << std::endl;;
-            harddrop = false;
-            while (saved_board_state.size() > rule.undoSteps)
-                saved_board_state.pop_front();
-            saved_board_state.push_back({});
-            for (int k = 0; k < players_num; k++) {
-                saved_board_state.back().push_back(tetris[k]);
-            }
-        }
-        else if (undo && saved_board_state.size() > 1 && rule.turnbase && rule.undoSteps > 0) {
+        // undo
+        if (undo && saved_board[0].size() > 1 && rule.turnbase && rule.undoSteps > 0) {
             lastGameState = 0;
-            saved_board_state.pop_back();
-            auto lastState = saved_board_state.back();
-            for (int k = 0; k < players_num; k++) {
-                tetris[k] = lastState[k];
+            saved_board[0].pop_back();
+            auto lastState = saved_board[0].back();
+            while (saved_board[1].back().n_pieces > lastState.n_pieces)
+                saved_board[1].pop_back();
+            tetris[0] = lastState;
+            if (saved_board[1].back().n_pieces == lastState.n_pieces) {
+                while (tetris[1].ai_movs_flag != -1) ::Sleep(1);
+                tetris[1] = saved_board[1].back();
             }
         }
         for (int i = 0; i < players_num; i++) {
