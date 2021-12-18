@@ -245,8 +245,8 @@ void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid, i
     }
     if ( ! tetris.accept_atts.empty() ) {
         int atts = 0;
-        for ( std::vector<int>::const_iterator it = tetris.accept_atts.begin(); it != tetris.accept_atts.end(); ++it ) {
-            atts += *it;
+        for ( auto it = tetris.accept_atts.begin(); it != tetris.accept_atts.end(); ++it ) {
+            atts += it->atk;
         }
 
         setfillcolor(hsv2rgb(0.0f, 1.0f, 1.0f));
@@ -1121,7 +1121,7 @@ void mainscene() {
     struct delayed_attack_s {
         double time; // attack sent time in second
         int attacker; // who sent the attack
-        int attack; // number of attack
+        atk_s attack; // number of attack
     };
     std::vector<struct delayed_attack_s> delayed_attack_q;
     std::list<TetrisGame> saved_board[2];
@@ -1250,7 +1250,7 @@ void mainscene() {
                             for (int i = 0; i < players_num; ++i) {
                                 tetris[i].reset(seed ^ ((!rule.samesequence) * i * 255), pass);
                                 onGameStart(tetris[i], rnd, i);
-                                tetris[i].acceptAttack(player_begin_attack);
+                                tetris[i].acceptAttack(tetris[i].genAttack(player_begin_attack));
                             }
                             if (player.sound_bgm) GameSound::ins().loadBGM(rnd);
                         }
@@ -1269,7 +1269,7 @@ void mainscene() {
                                 tetris[i].reset( seed ^ ((!rule.samesequence) * i * 255), pass );
                                 //tetris[i].reset( (unsigned)time(0) + ::GetTickCount() * i );
                                 onGameStart( tetris[i], rnd, i );
-                                tetris[i].acceptAttack(player_begin_attack);
+                                tetris[i].acceptAttack(tetris[i].genAttack(player_begin_attack));
                                 ++count;
                                 saved_board[i].push_back(tetris[i]);
                             }
@@ -1298,7 +1298,7 @@ void mainscene() {
                     }
                     if ( PUBLIC_VERSION == 0 ) {
                         if ( k.key == key_f9 ) {
-                            tetris[1].accept_atts.push_back(1);
+                            tetris[1].accept_atts.push_back(tetris[1].genAttack(1));
                         }
                     }
                 }
@@ -1382,22 +1382,22 @@ void mainscene() {
                         if ( rule.GarbageCancel ) {
                             // first cancel garbage in the garbage buffer
                             while ( att > 0 && ! tetris[i].accept_atts.empty() ) {
-                                int m = min( att, tetris[i].accept_atts[0]);
+                                int m = min( att, tetris[i].accept_atts[0].atk);
                                 att -= m;
-                                tetris[i].accept_atts[0] -= m;
-                                if ( tetris[i].accept_atts[0] <= 0 ) {
+                                tetris[i].accept_atts[0].atk -= m;
+                                if ( tetris[i].accept_atts[0].atk <= 0 ) {
                                     tetris[i].accept_atts.erase( tetris[i].accept_atts.begin() );
                                 }
                             }
                             // second cancel delayed attack
                             // attack in the delayed attack queue can only belongs to one player
                             while (att > 0 && !delayed_attack_q.empty() && delayed_attack_q.front().attacker != i) {
-                                if (att > delayed_attack_q.front().attack) {
-                                    att -= delayed_attack_q.front().attack;
+                                if (att > delayed_attack_q.front().attack.atk) {
+                                    att -= delayed_attack_q.front().attack.atk;
                                     delayed_attack_q.erase(delayed_attack_q.begin());
                                 }
                                 else {
-                                    delayed_attack_q.front().attack -= att;
+                                    delayed_attack_q.front().attack.atk -= att;
                                     att = 0;
                                 }
                             }
@@ -1405,13 +1405,13 @@ void mainscene() {
                         // send garbage
                         if ( att > 0 ) {
                             if (DELAYED_ATTACK && rule.DelayedAttackTime != 0) {
-                                delayed_attack_q.push_back({ fclock(), i, att});
+                                delayed_attack_q.push_back({ fclock(), i, tetris[i].genAttack(att)});
                             }
                             else {
                                 for (int j = 0; j < players_num; ++j) {
                                     if (i == j) continue;
                                     if (rule.GarbageBuffer) {
-                                        tetris[j].accept_atts.push_back(att);
+                                        tetris[j].accept_atts.push_back(tetris[i].genAttack(att));
                                         if (j == 0 && saved_board[j].back().n_pieces == tetris[j].n_pieces) {
                                             saved_board[j].back().accept_atts = tetris[j].accept_atts;
                                         }
@@ -1420,7 +1420,7 @@ void mainscene() {
                                     }
                                     else {
                                         if (player_accept_attack)
-                                            tetris[j].acceptAttack(att);
+                                            tetris[j].acceptAttack(tetris[i].genAttack(att));
                                         if (rule.turnbase) tetris[j].env_change = 2;
                                     }
                                 }
@@ -1433,27 +1433,27 @@ void mainscene() {
                         while ( ! tetris[i].accept_atts.empty() ) {
                             if (cap == 0) break;
                             if (TETRIO_ATTACK_TABLE && cap != -1) {
-                                if (cap < *tetris[i].accept_atts.begin()) {
-                                    tetris[i].acceptAttack(cap);
-                                    *tetris[i].accept_atts.begin() -= cap;
+                                if (cap < tetris[i].accept_atts.front().atk) {
+                                    tetris[i].acceptAttack({cap,tetris[i].accept_atts.front().pos});
+                                    tetris[i].accept_atts.front().atk -= cap;
                                     cap = 0;
                                     break;
                                 }
                                 else {
-                                    cap -= *tetris[i].accept_atts.begin();
-                                    tetris[i].acceptAttack(*tetris[i].accept_atts.begin());
+                                    cap -= tetris[i].accept_atts.front().atk;
+                                    tetris[i].acceptAttack(tetris[i].accept_atts.front());
                                 }
                             }
                             else if ( rule.garbage == 0 ) {
                                 tetris[i].acceptAttack( *tetris[i].accept_atts.begin() );
                             } else if ( rule.garbage == 1 ) {
-                                for ( int n = *tetris[i].accept_atts.begin(); n > 0; n-= 2 ) {
-                                    if ( n >= 2 ) tetris[i].acceptAttack( 2 );
-                                    else tetris[i].acceptAttack( 1 );
+                                for ( int n = tetris[i].accept_atts.front().atk; n > 0; n-= 2 ) {
+                                    if ( n >= 2 ) tetris[i].acceptAttack(tetris[i].genAttack(2));
+                                    else tetris[i].acceptAttack( tetris[i].genAttack(1));
                                 }
                             } else { //if ( rule.garbage == 2 ) {
-                                for ( int n = *tetris[i].accept_atts.begin(); n > 0; --n ) {
-                                    tetris[i].acceptAttack( 1 );
+                                for ( int n = tetris[i].accept_atts.front().atk; n > 0; --n ) {
+                                    tetris[i].acceptAttack(tetris[i].genAttack(1));
                                 }
                             }
                             tetris[i].accept_atts.erase( tetris[i].accept_atts.begin() );
@@ -1474,10 +1474,12 @@ void mainscene() {
                             next.push_back(tetris[i].m_next[j]);
                         double beg = (double)::GetTickCount() / 1000;
                         int deep = ai_search_height_deep;
-                        int upcomeAtt = 0; // TODO: make AI think with garbage cap
+                        int upcomeAtt = 0;
                         for ( int j = 0; j < tetris[i].accept_atts.size(); ++j ) {
-                            upcomeAtt += tetris[i].accept_atts[j];
+                            upcomeAtt += tetris[i].accept_atts[j].atk;
                         }
+                        // if there is an garbage cap, ai will take it into consideration
+                        upcomeAtt = (rule.GarbageCap > 0) ? min(upcomeAtt, rule.GarbageCap) : upcomeAtt;
                         int level = ai[i].level;
                         //if ( tetris[i].m_pool.row[6] ) {
                         //    deep = ai_search_height_deep;
@@ -1524,7 +1526,7 @@ void mainscene() {
                 if ( ! tetris[i].alive() ) continue;
                 int total = 0;
                 for ( int j = 0; j < tetris[i].accept_atts.size(); ++j ) {
-                    total += tetris[i].accept_atts[j];
+                    total += tetris[i].accept_atts[j].atk;
                 }
                 if ( total >= 100 * 1 ) { // TODO
                     tetris[i].m_state = AI::Tetris::STATE_OVER;
