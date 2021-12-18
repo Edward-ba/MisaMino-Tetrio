@@ -1412,6 +1412,9 @@ void mainscene() {
                                     if (i == j) continue;
                                     if (rule.GarbageBuffer) {
                                         tetris[j].accept_atts.push_back(att);
+                                        if (saved_board[j].back().n_pieces == tetris[j].n_pieces) {
+                                            saved_board[j].back().accept_atts = tetris[j].accept_atts;
+                                        }
                                         tetris[i].total_sent += att;
                                         if (rule.turnbase) tetris[j].env_change = 2;
                                     }
