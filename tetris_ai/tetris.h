@@ -2,7 +2,7 @@
 #include "gamepool.h"
 #include "random.h"
 #include "tetris_ai.h"
-
+#include <iostream>
 namespace AI {
 
     struct point {
@@ -56,6 +56,16 @@ namespace AI {
             m_state = STATE_INIT;
             reset ( 0, 10, 20 );
         }
+        // use tetrio way to generate bag of minos
+        void genNextTetrio() {
+            // I1 T2 L3 J4 Z5 S6 O7
+            int m[] = {5,3,7,6,1,4,2}; // ["z", "l", "o", "s", "i", "j", "t"]
+            t_rand.shuffleArray(m);
+            for (int i = 0; i < 7; ++i) {
+                m_next[m_next_num + i] = AI::getGem( m[i], 0);
+            }
+            m_next_num += 7;
+        }
         void genNext() {
             int m[] = {1,2,3,4,5,6,7};
             int s[7];
@@ -78,8 +88,11 @@ namespace AI {
         void reset (unsigned seed, signed char w, signed char h) {
             m_pool.reset( w, h );
             m_rand.seed( seed );
+            t_rand.setSeed(seed);
             m_next_num = 0;
-            while ( m_next_num < 100 ) genNext();
+            while (m_next_num < 100)
+                if(TETRIO_ATTACK_TABLE) genNextTetrio();
+                else genNext();
             //for ( int i = 0; i < 32; ++i ) {
             //    m_next[i] = AI::getGem( m_rand.randint(7) + 1, 0);
             //}
@@ -348,7 +361,9 @@ namespace AI {
                 m_next[i - 1] = m_next[i];
             }
             --m_next_num;
-            while ( m_next_num < 100 ) genNext();
+            while (m_next_num < 100)
+                if (TETRIO_ATTACK_TABLE) genNextTetrio();
+                else genNext();
             //m_next[15] = AI::getGem( m_rand.randint(7) + 1, 0);
         }
         bool newpiece() {
@@ -417,10 +432,9 @@ namespace AI {
         bool alive () const {
             return m_state != STATE_OVER;
         }
-    public:
         int m_state;
-    public:
         Random m_rand;
+        RandomTetrio t_rand;
         AI::GameField m_pool;
         AI::Gem m_cur;
         int m_color_pool[64][32];

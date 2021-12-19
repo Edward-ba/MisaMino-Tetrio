@@ -1268,7 +1268,7 @@ void mainscene() {
                             for ( int i = 0; i < players_num; ++i ) {
                                 tetris[i].reset( seed ^ ((!rule.samesequence) * i * 255), pass );
                                 //tetris[i].reset( (unsigned)time(0) + ::GetTickCount() * i );
-                                onGameStart( tetris[i], rnd, i );
+                                onGameStart( tetris[i], rnd, i ); // basically useless
                                 tetris[i].acceptAttack(tetris[i].genAttack(player_begin_attack));
                                 ++count;
                                 saved_board[i].push_back(tetris[i]);
