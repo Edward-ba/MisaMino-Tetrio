@@ -1479,7 +1479,7 @@ void mainscene() {
                             upcomeAtt += tetris[i].accept_atts[j].atk;
                         }
                         // if there is an garbage cap, ai will take it into consideration
-                        upcomeAtt = (rule.GarbageCap > 0) ? min(upcomeAtt, rule.GarbageCap) : upcomeAtt;
+                        // upcomeAtt = (rule.GarbageCap > 0) ? min(upcomeAtt, rule.GarbageCap) : upcomeAtt;
                         int level = ai[i].level;
                         //if ( tetris[i].m_pool.row[6] ) {
                         //    deep = ai_search_height_deep;
