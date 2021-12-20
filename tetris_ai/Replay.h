@@ -6,17 +6,19 @@
 #include <string>
 #include <vector>
 #include <fstream>
+
 namespace RP {
 	using json = nlohmann::json;
 
 
 	enum {
 		FULL,
-		START,
-		TARGETS,
 		KEYDOWN,
 		KEYUP,
+		START,
+		TARGETS,
 		IGE,
+		IGE_C,
 		END
 	};
 	enum {
@@ -53,59 +55,10 @@ namespace RP {
 		int frame;
 		double subframe;
 	} frame_t;
-	class Replay
-	{
-		std::string filename;
-		json r, data, endcontext;
-	public:
-		Replay(std::string filename, std::string timestamp) {
-			this->filename = filename;
-			r["ts"] = timestamp;
-			r["ismulti"] = true;
-			r["data"] = json::array();
-			r["endcontext"] = json::array();
-		}
-		void toFile(std::string fn) {
-			std::ofstream f;
-			f.open(fn+".ttrm");
-			f << r;;
-			f.close();
-		}
-		void setUser(std::string user1, std::string user2, int user1ID = 0, int user2ID = 0) {
-			json juser1 = {
-				{ "user",{"_id",user1ID}, {"username",user1}},
-				{ "active",true }
-			};
-			json juser2 = {
-				{ "user",{"_id",user2ID}, {"username",user2}},
-				{ "active",true }
-			};
-			endcontext.push_back(juser1);
-			endcontext.push_back(juser2);
-		}
-		void insertGame(GameRecord g) {
-			r["data"].push_back(g.getGame());
-		}
-	};
-	class GameRecord
-	{
-		json game;
-	public:
-		GameRecord() {
-			game["board"] = json::array();
-			game["replays"] = json::array();
-		}
-		void insertGame(playerRecord r) {
-			game["board"].push_back(r.getInfo());
-			game["replays"].push_back(r.getEvents());
-		}
-		json getGame() {
-			return game;
-		}
-	};
 	class playerRecord
 	{
 		int cid = 0;
+		int id = 0;
 		json info;
 		json evt;
 		json handling;
@@ -121,18 +74,26 @@ namespace RP {
 			};
 			evt["events"] = json::array();
 			totalFrames = 0;
-			board["board"] = json::array();
+			board = json::array();
 			int row[10] = { 0 };
 			for (int i = 0; i < 40; i++) {
-				board["board"].push_back(row);
+				board.push_back(row);
 			}
 		}
+		void reset() {
+			evt.clear();
+			options.clear();
+			endGameStat.clear();
+			totalFrames = 0;
+		}
+		// no need to reset
 		void setUSer(std::string username, int id = 0) {
 			info["user"]["username"] = username;
 			info["user"]["_id"] = id;
 		}
+		// no need to reset
 		void setHandling(int arr, int das, int sdf) {
-			handling["handling"] = {
+			handling = {
 				{"arr",arr},
 				{"das",das},
 				{"dcd",0},
@@ -151,7 +112,7 @@ namespace RP {
 			evt["frames"] = totalFrame;
 		}
 		void setOption(unsigned seed, int cap) {
-			options["options"] = {
+			options = {
 				{"version",15},
 				{"seed_random",false},
 				{"seed",seed},
@@ -185,7 +146,7 @@ namespace RP {
 				{"garbagecapmax",40},
 				{"bagtype","7bag"},
 				{"spinbonuses","T-spins"},
-				{"kickset","SRS"},
+				{"kickset","SRS+"},
 				{"nextcount",5},
 				{"allow_harddrop",true},
 				{"display_shadow",true},
@@ -222,15 +183,23 @@ namespace RP {
 				}}
 			};
 		}
-		void insertEvent(int evt, int frame, void* param) {
+		void insertEvent(int evt, int frame, void* param, double subframe = 0.0) {
 			json event;
 			event["frame"] = frame;
+			int k;
+			atk_t atk;
+			bool win;
 			switch (evt) {
 			case FULL:
 				event["type"] = "full";
 				event["data"] = {
-					{"game", {board, handling, {"playing", true}}},
-					options
+					{"game", {
+						{"board",board},
+						{"handling",handling},
+						{"playing", true}
+						}
+					},
+					{"options",options }
 				};
 				break;
 			case START:
@@ -246,7 +215,7 @@ namespace RP {
 				};
 				break;
 			case KEYDOWN:
-				int k = *(int*)param;
+				k = *(int*)param;
 				event["type"] = "keydown";
 				event["data"] = {
 					{"key",key[k]},
@@ -254,7 +223,7 @@ namespace RP {
 				};
 				break;
 			case KEYUP:
-				int k = *(int*)param;
+				k = *(int*)param;
 				event["type"] = "keyup";
 				event["data"] = {
 					{"key",key[k]},
@@ -262,35 +231,64 @@ namespace RP {
 				};
 				break;
 			case IGE:
-				atk_t atk = *(atk_t*)param;
+				atk = *(atk_t*)param;
 				event["type"] = "ige";
 				event["data"] = {
-					{"type","interaction"},
-					{"data",
-						{"type","garbage"},
-						{"amt",atk.atk},
-						{"x",0},{"y",0},
-						{"column",atk.pos}
+					{"type","ige"},
+					{"data",{
+						{"type","interaction"},
+						{"sent_frame", frame-1},
+						{"cid",++cid},
+						{"data",{
+							{"type","garbage"},
+							{"amt",atk.atk},
+							{"x",0},{"y",0},
+							{"column",atk.pos}
+							}
+						}
+						}
 					},
-					{"sent_frame",frame-1},
-					{"cid",++cid}
+					{"frame",frame},
+					{"id",++id}
 				};
-				this->evt.push_back(event);
-				event["frame"]= frame+1;
-				event["data"]["type"] = "interaction_confirm";
+				break;
+			case IGE_C:
+				atk = *(atk_t*)param;
+				event["type"] = "ige";
+				event["data"] = {
+					{"type","ige"},
+					{"data",{
+						{"type","interaction_confirm"},
+						{"sent_frame", frame - 1},
+						{"cid",cid},
+						{"data",{
+							{"type","garbage"},
+							{"amt",atk.atk},
+							{"x",0},{"y",0},
+							{"column",atk.pos}
+							}
+						}
+						}
+					},
+					{"frame",frame},
+					{"id",++id}
+				};
 				break;
 			case END:
-				int win = (int)param;
+				win = *(bool*)param;
 				event["type"] = "end";
 				event["data"] = {
-					{"reason",(win)?"winner":"topout"},
-					{"export",{"aggregatestats",endGameStat}}
+					{"reason",(win) ? "winner" : "topout"},
+					{"export",{{"aggregatestats",endGameStat}}}
 				};
 				break;
 			default:
 				break;
 			}
 			this->evt["events"].push_back(event);
+			if (evt == IGE) {
+				insertEvent(IGE_C, frame + 1, param);
+			}
 		}
 		json getInfo() {
 			return info;
@@ -299,6 +297,65 @@ namespace RP {
 			return evt;
 		}
 	};
-}
+	class GameRecord
+	{
+		json game;
+	public:
+		GameRecord() {
+			game["board"] = json::array();
+			game["replays"] = json::array();
+		}
+		void insertGame(playerRecord r) {
+			game["board"].push_back(r.getInfo());
+			game["replays"].push_back(r.getEvents());
+		}
+		void reset(){
+			game.clear();
+			game["board"] = json::array();
+			game["replays"] = json::array();
+		}
+		json getGame() {
+			return game;
+		}
+	};
+	class Replay
+	{
+	std::string filename;
+	json r, data;
+	public:
+	Replay(std::string filename, std::string timestamp) {
+		this->filename = filename;
+		r["ts"] = timestamp;
+		r["ismulti"] = true;
+		r["data"] = json::array();
+		r["endcontext"] = json::array();
+	}
+	void reset(std::string filename, std::string timestamp) {
+		this->filename = filename;
+		r["ts"] = timestamp;
+	}
+	void toFile() {
+		std::ofstream f;
+		f.open(this->filename + ".ttrm");
+		f << r;;
+		f.close();
+	}
+	void setUser(std::string user1, std::string user2, int user1ID = 0, int user2ID = 0) {
+		json juser1 = {
+			{ "user",{{"_id",user1ID}, {"username",user1}} },
+			{ "active",true }
+		};
+		json juser2 = {
+			{ "user",{{"_id",user2ID}, {"username",user2}} },
+			{ "active",true }
+		};
+		r["endcontext"].push_back(juser1);
+		r["endcontext"].push_back(juser2);
 
+	}
+	void insertGame(GameRecord g) {
+		r["data"].push_back(g.getGame());
+	}
+	};
+}
 #endif

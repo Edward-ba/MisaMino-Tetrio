@@ -10,6 +10,11 @@
 #include <map>
 #include <list>
 #include <iostream>
+#include <iomanip>
+#include <ctime>
+#include "Replay.h"
+#include <string>
+#include <sstream>
 
 int enable_autostart = 0;
 int autostart_interval = 0;
@@ -1127,6 +1132,25 @@ void mainscene() {
     std::list<TetrisGame> saved_board[2];
     int saved_board_num[] = { rule.undoSteps, rule.undoSteps + 10 };
     bool undo = false;
+
+    RP::Replay rp("", "");
+    rp.setUser(tetris[0].m_name, tetris[1].m_name);
+    RP::GameRecord gRecord;
+    std::vector<RP::playerRecord> pRecord(2);
+    for (int i = 0; i < players_num; i++) {
+        pRecord[i].setUSer(tetris[i].m_name,i);
+        pRecord[i].setHandling(player.arr, player.das, (i == 0)?player.softdropdelay:60);
+    }
+    int key2action[] = {
+        RP::moveLeft,
+        RP::moveRight,
+        RP::softDrop,
+        RP::rotateCCW,
+        RP::rotateCW,
+        RP::hold,
+        RP::hardDrop,
+        RP::rotate180
+    };
     for ( ; is_run() ; normal_delay ? delay_fps(60) : delay_ms(0) ) {
         undo = false;
         for ( int jf = 0; jf < mainloop_times; ++jf) {
@@ -1147,11 +1171,32 @@ void mainscene() {
             } else {
                 if ( lastGameState == 0 ) {
                     done_pupu = true;
+                    bool tf[] = { false,true };
+                    double pps[2] = {
+                        (tetris[0].n_pieces - 1) * 60.0 / tetris[0].m_drop_frame,
+                        (tetris[1].n_pieces - 1) * 60.0 / tetris[1].m_drop_frame
+                    };
+                    double apm[2] = {
+                        tetris[0].total_atts * 60.0 * 60.0 / tetris[0].m_drop_frame,
+                        tetris[1].total_atts * 60.0 * 60.0 / tetris[1].m_drop_frame
+                    };
+                    double vs[2];// TODO
+                    pRecord[0].setEndGameStat(tetris[0].m_frames, apm[0], pps[0], 0.0);
+                    pRecord[1].setEndGameStat(tetris[1].m_frames, apm[1], pps[1], 0.0);
+
                     if ( tetris[1].alive() ) {
                         tetris[0].ko();
+                        pRecord[0].setWin(false);
+                        pRecord[1].setWin(true);
+                        pRecord[0].insertEvent(RP::END, tetris[0].m_frames, tf);
+                        pRecord[1].insertEvent(RP::END, tetris[1].m_frames, &tf[1]);
                         tetris[1].n_win++;
                     } else {
                         tetris[1].ko();
+                        pRecord[1].setWin(false);
+                        pRecord[0].setWin(true);
+                        pRecord[1].insertEvent(RP::END, tetris[1].m_frames, tf);
+                        pRecord[0].insertEvent(RP::END, tetris[0].m_frames, &tf[1]);
                         tetris[0].n_win++;
                     }
                     //GameSound::ins().stopBGM();
@@ -1185,6 +1230,7 @@ void mainscene() {
                     if ( k.msg == key_msg_up ) {
                         for ( int i = 0; i < 8; ++i ) {
                             if ( player_key_state[i] && (k.key == player_keys[i] ) ) {
+                                pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[i]);
                                 player_key_state[i] = 0;
                             }
                         }
@@ -1198,18 +1244,21 @@ void mainscene() {
                     //}
                     if ( k.key == player_keys[0] && player_key_state[0] == 0 ) {
                         tetris[0].tryXMove(-1);
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[0]);
                         player_key_state[0] = 1;
                         player_key_state[1] = 0;
                         //player_key_state[2] = 0;
                     }
                     if ( k.key == player_keys[1] && player_key_state[1] == 0 ) {
                         tetris[0].tryXMove( 1);
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[1]);
                         player_key_state[0] = 0;
                         player_key_state[1] = 1;
                         //player_key_state[2] = 0;
                     }
                     if ( k.key == player_keys[2] && player_key_state[2] == 0 ) {
                         tetris[0].tryYMove( 1);
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[2]);
                         //while ( tetris[0].tryYMove( 1) );
                         //player_key_state[0] = 0;
                         //player_key_state[1] = 0;
@@ -1217,10 +1266,12 @@ void mainscene() {
                     }
                     if ( k.key == player_keys[3] && player_key_state[3] == 0 ) {
                         tetris[0].trySpin( 1);
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[3]);
                         player_key_state[3] = 1;
                     }
                     if ( k.key == player_keys[4] && player_key_state[4] == 0 ) {
                         tetris[0].trySpin( 3);
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[4]);
                         player_key_state[4] = 1;
                     }
                     if ( k.key == player_keys[5] && player_key_state[5] == 0 ) {
@@ -1230,10 +1281,12 @@ void mainscene() {
                         else {
                             tetris[0].tryHold();
                         }
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[5]);
                         player_key_state[5] = 1;
                     }
                     if ( k.key == player_keys[6] && player_key_state[6] == 0 ) {
                         tetris[0].drop();
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[6]);
                         //player_key_state[0] = !!player_key_state[0];
                         //player_key_state[1] = !!player_key_state[1];
                         //player_key_state[2] = !!player_key_state[2];
@@ -1241,6 +1294,7 @@ void mainscene() {
                     }
                     if ( k.key == player_keys[7] && player_key_state[7] == 0 && AI::spin180Enable() ) {
                         tetris[0].trySpin180();
+                        pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[7]);
                         player_key_state[7] = 1;
                     }
                     if (done_pupu == true && enable_autostart == 1) {
@@ -1261,12 +1315,32 @@ void mainscene() {
                     }
                     if ( k.key == key_f2 ) {
                         if ( !tetris[0].alive() || !tetris[1].alive() || tetris[0].n_pieces <= 20 ) {
+                            // generate filename and timestamp
+                            auto t = std::time(nullptr);
+                            auto tm = *std::localtime(&t);
+                            std::ostringstream oss, oss2;
+                            oss2 << tm.tm_year << tm.tm_mon << tm.tm_hour << tm.tm_min << tm.tm_sec;
+                            std::string fn = oss2.str();
+                            oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+                            std::string str = oss.str();
+                            // end of generation
+                            // reset replay classes
+                            rp.reset(fn, str);
+                            gRecord.reset();
+                            pRecord[0].reset();
+                            pRecord[1].reset();
+                            //
                             int seed = (unsigned)time(0), pass = rnd.randint(1024);
                             delayed_attack_q.clear();
                             saved_board[0].clear();
                             saved_board[1].clear();
                             for ( int i = 0; i < players_num; ++i ) {
-                                tetris[i].reset( seed ^ ((!rule.samesequence) * i * 255), pass );
+                                //seed = seed ^ ((!rule.samesequence) * i * 255);
+                                tetris[i].reset( seed, pass );
+                                pRecord[i].setOption(seed, rule.GarbageCap);
+                                pRecord[i].insertEvent(RP::FULL, 0, NULL);
+                                pRecord[i].insertEvent(RP::START, 0, NULL);
+                                pRecord[i].insertEvent(RP::TARGETS, 0, NULL);
                                 //tetris[i].reset( (unsigned)time(0) + ::GetTickCount() * i );
                                 onGameStart( tetris[i], rnd, i ); // basically useless
                                 tetris[i].acceptAttack(tetris[i].genAttack(player_begin_attack));
@@ -1275,6 +1349,13 @@ void mainscene() {
                             }
                             if ( player.sound_bgm ) GameSound::ins().loadBGM( rnd );
                         }
+                    }
+                    // output replay
+                    if (k.key == key_f11 && lastGameState == -1) {
+                        gRecord.insertGame(pRecord[0]);
+                        gRecord.insertGame(pRecord[1]);
+                        rp.insertGame(gRecord);
+                        rp.toFile();
                     }
                     if ( k.key == key_f12 ) {
                         setkeyScene( player_keys );
@@ -1347,6 +1428,7 @@ void mainscene() {
                             if (atk.attacker == j) continue;
                             if (rule.GarbageBuffer) {
                                 tetris[j].accept_atts.push_back(atk.attack);
+                                pRecord[j].insertEvent(RP::IGE, tetris[j].m_frames, &atk);
                                 if (rule.turnbase) tetris[j].env_change = 2; // don't know what it means
                             }
                             else {
@@ -1412,6 +1494,7 @@ void mainscene() {
                                     if (i == j) continue;
                                     if (rule.GarbageBuffer) {
                                         tetris[j].accept_atts.push_back(tetris[i].genAttack(att));
+                                        pRecord[j].insertEvent(RP::IGE, tetris[j].m_frames, &tetris[j].accept_atts.back());
                                         if (j == 0 && saved_board[j].back().n_pieces == tetris[j].n_pieces) {
                                             saved_board[j].back().accept_atts = tetris[j].accept_atts;
                                         }
@@ -1550,31 +1633,76 @@ void mainscene() {
                 //    else if (tetris[i].mov_llrr == AI::Moving::MOV_RR) {if ( ! tetris[i].tryXMove( 1) ) tetris[i].mov_llrr = 0;}
                 //} else
                 {
+                    double subframe = 0.0;
+                    double smalldiff = 0.01;
                     do
                     {
                         if ( tetris[i].ai_delay > 0 ) ;
-                        else if ( tetris[i].ai_movs_flag == -1 && ! tetris[i].ai_movs.movs.empty() ){
-                            if ( rule.turnbase && ai[0].style == 0 ) {
+                        else if (tetris[i].ai_movs_flag == -1 && !tetris[i].ai_movs.movs.empty()) {
+                            if (rule.turnbase && ai[0].style == 0) {
                                 tetris[i].ai_delay = ai_mov_time_base;
-                            } else {
+                            }
+                            else {
                                 tetris[i].ai_delay = ai_move_delay;
                             }
                             int mov = tetris[i].ai_movs.movs[0];
-                            if ( tetris[i].ai_movs.movs.size() > 1 ) {
+                            if (tetris[i].ai_movs.movs.size() > 1) {
                                 int next_mov = tetris[i].ai_movs.movs[1];
-                                if ( mov != next_mov ) tetris[i].ai_delay = tetris[i].ai_delay * 8 / 12;
+                                if (mov != next_mov) tetris[i].ai_delay = tetris[i].ai_delay * 8 / 12;
                             }
-                            tetris[i].ai_movs.movs.erase( tetris[i].ai_movs.movs.begin() );
-                            if (0) ;
-                            else if (mov == AI::Moving::MOV_L) tetris[i].tryXMove(-1);
-                            else if (mov == AI::Moving::MOV_R) tetris[i].tryXMove( 1);
-                            else if (mov == AI::Moving::MOV_D) tetris[i].tryYMove( 1);
-                            else if (mov == AI::Moving::MOV_LSPIN) tetris[i].trySpin(1);
-                            else if (mov == AI::Moving::MOV_RSPIN) tetris[i].trySpin(3);
-                            else if (mov == AI::Moving::MOV_LL) { tetris[i].tryXXMove(-1); } //{ tetris[i].mov_llrr = AI::Moving::MOV_LL; }
-                            else if (mov == AI::Moving::MOV_RR) { tetris[i].tryXXMove( 1); } //{ tetris[i].mov_llrr = AI::Moving::MOV_RR; }
-                            else if (mov == AI::Moving::MOV_DD) tetris[i].tryYYMove( 1) ;
-                            else if (mov == AI::Moving::MOV_DROP) tetris[i].drop();
+                            tetris[i].ai_movs.movs.erase(tetris[i].ai_movs.movs.begin());
+                            if (0);
+                            else if (mov == AI::Moving::MOV_L) {
+                                tetris[i].tryXMove(-1);
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[0], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[0], subframe += smalldiff);
+                            }
+                            else if (mov == AI::Moving::MOV_R) {
+                                tetris[i].tryXMove(1);
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[1], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[1], subframe += smalldiff);
+                            }
+                            else if (mov == AI::Moving::MOV_D) { // better not use, replay will be strange
+                                tetris[i].tryYMove(1);
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
+                            }
+                            else if (mov == AI::Moving::MOV_LSPIN) {
+                                tetris[i].trySpin(1);
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[3], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[3], subframe += smalldiff);
+                            }
+                            else if (mov == AI::Moving::MOV_RSPIN) {
+                                tetris[i].trySpin(3);
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[4], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[4], subframe += smalldiff);
+                            }
+                            else if (mov == AI::Moving::MOV_LL) {
+                                tetris[i].tryXXMove(-1);
+                                for (int k = 0; k < 6; k++) {
+                                    pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[0], subframe += smalldiff);
+                                    pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[0], subframe += smalldiff);
+                                }
+                            } //{ tetris[i].mov_llrr = AI::Moving::MOV_LL; }
+                            else if (mov == AI::Moving::MOV_RR) {
+                                tetris[i].tryXXMove(1);
+                                for (int k = 0; k < 6; k++) {
+                                    pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[1], subframe += smalldiff);
+                                    pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[1], subframe += smalldiff);
+                                }
+                            } //{ tetris[i].mov_llrr = AI::Moving::MOV_RR; }
+                            else if (mov == AI::Moving::MOV_DD) {
+                                tetris[i].tryYYMove(1);
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
+                                // need to keep pressing sd for at least 1 frame
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[2], subframe);
+                            }
+                            else if (mov == AI::Moving::MOV_DROP) {
+                                tetris[i].drop();
+                                // hd will drop immediately, better move to next frame
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames+1, &key2action[6], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[6], subframe += smalldiff);
+                            }
                             else if (mov == AI::Moving::MOV_HOLD) {
                                 if (rule.InfinityHold == 1) {
                                     tetris[i].tryInfinityHold();
@@ -1582,9 +1710,13 @@ void mainscene() {
                                 else {
                                     tetris[i].tryHold();
                                 }
+                                pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[5], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[5], subframe += smalldiff);
                             } else if (mov == AI::Moving::MOV_SPIN2) {
                                 if ( AI::spin180Enable() ) {
                                     tetris[i].trySpin180();
+                                    pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[7], subframe += smalldiff);
+                                    pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[7], subframe += smalldiff);
                                 }
                             } else if (mov == AI::Moving::MOV_REFRESH) {
                                 tetris[i].env_change = 1;
