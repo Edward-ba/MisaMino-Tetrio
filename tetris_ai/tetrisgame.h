@@ -16,7 +16,7 @@
 typedef struct {
     int atk;
     int pos;
-} atk_s;
+} atk_t;
 
 class TetrisGame : public AI::Tetris {
 public:
@@ -279,14 +279,14 @@ public:
             GameSound::ins().mSFX_lineattack.play(m_lr);
         }
     }
-    atk_s genAttack(int n) {
+    atk_t genAttack(int n) {
         int rowdata = m_randatt.randint(m_pool.m_w);
         while (m_last_hole_x == rowdata) {
             rowdata = m_randatt.randint(m_pool.m_w);
         }
         return { n, rowdata };
     }
-    void acceptAttack(atk_s n) {
+    void acceptAttack(atk_t n) {
         int att[2] = { 0 };
         for (int i = 0; i < 32; i += 2) {
             att[0] |= 1 << i;
@@ -343,7 +343,7 @@ public:
     int mov_llrr;
     int env_change;
     int n_pieces;
-    std::vector<atk_s> accept_atts;
+    std::vector<atk_t> accept_atts;
     int m_last_hole_x;
     int n_win;
     int total_clears;
