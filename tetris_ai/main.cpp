@@ -1121,7 +1121,7 @@ void mainscene() {
     struct delayed_attack_s {
         double time; // attack sent time in second
         int attacker; // who sent the attack
-        atk_s attack; // number of attack
+        atk_t attack; // number of attack
     };
     std::vector<struct delayed_attack_s> delayed_attack_q;
     std::list<TetrisGame> saved_board[2];
