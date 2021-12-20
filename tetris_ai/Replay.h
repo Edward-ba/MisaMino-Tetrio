@@ -151,7 +151,7 @@ namespace RP {
 				{"allow_harddrop",true},
 				{"display_shadow",true},
 				{"locktime",30},
-				{"garbagespeed",0},
+				{"garbagespeed",1},
 				{"forfeit_time",150},
 				{"are",0},
 				{"lineclear_are",0},
