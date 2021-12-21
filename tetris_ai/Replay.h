@@ -146,7 +146,7 @@ namespace RP {
 				{"garbagecapmax",40},
 				{"bagtype","7bag"},
 				{"spinbonuses","T-spins"},
-				{"kickset","SRS+"},
+				{"kickset","SRS"},
 				{"nextcount",5},
 				{"allow_harddrop",true},
 				{"display_shadow",true},
@@ -321,7 +321,7 @@ namespace RP {
 	class Replay
 	{
 	std::string filename;
-	json r, data;
+	json r;
 	public:
 	Replay(std::string filename, std::string timestamp) {
 		this->filename = filename;
@@ -333,6 +333,7 @@ namespace RP {
 	void reset(std::string filename, std::string timestamp) {
 		this->filename = filename;
 		r["ts"] = timestamp;
+		r["data"].clear();
 	}
 	void toFile() {
 		std::ofstream f;

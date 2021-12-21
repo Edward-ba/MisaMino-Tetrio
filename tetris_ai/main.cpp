@@ -1336,6 +1336,7 @@ void mainscene() {
                             saved_board[1].clear();
                             for ( int i = 0; i < players_num; ++i ) {
                                 //seed = seed ^ ((!rule.samesequence) * i * 255);
+                                //seed = 1640111724;
                                 tetris[i].reset( seed, pass );
                                 pRecord[i].setOption(seed, rule.GarbageCap);
                                 pRecord[i].insertEvent(RP::FULL, 0, NULL);
@@ -1665,7 +1666,7 @@ void mainscene() {
                             else if (mov == AI::Moving::MOV_D) { // better not use, replay will be strange
                                 tetris[i].tryYMove(1);
                                 pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
-                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
+                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[2], subframe += smalldiff);
                             }
                             else if (mov == AI::Moving::MOV_LSPIN) {
                                 tetris[i].trySpin(1);
