@@ -325,7 +325,7 @@ void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid, i
         std::string info;
         char str[128];
         int att = tetris.m_clear_info.attack;
-        int b2b = tetris.m_clear_info.b2b > 1;
+        int b2b = (tetris.m_clear_info.b2b > 1) ? tetris.m_clear_info.b2b-1:0;
         int combo = tetris.m_clear_info.combo;
         int wallkick_spin = tetris.m_clear_info.wallkick_spin;
         {
@@ -359,7 +359,7 @@ void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid, i
             info += str;
         }
         if ( b2b ) {
-            sprintf(str, "b2b ");
+            sprintf(str, (b2b==1)?"b2b ":"b2bx%d ", b2b);
             info += str;
         }
         if ( combo > 1 ) {
