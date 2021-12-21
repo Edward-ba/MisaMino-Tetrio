@@ -287,7 +287,7 @@ namespace RP {
 			}
 			this->evt["events"].push_back(event);
 			if (evt == IGE) {
-				insertEvent(IGE_C, frame + 1, param);
+				insertEvent(IGE_C, frame, param);
 			}
 		}
 		json getInfo() {

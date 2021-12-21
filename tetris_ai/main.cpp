@@ -1139,7 +1139,7 @@ void mainscene() {
     std::vector<RP::playerRecord> pRecord(2);
     for (int i = 0; i < players_num; i++) {
         pRecord[i].setUSer(tetris[i].m_name,i);
-        pRecord[i].setHandling(player.arr, player.das, (i == 0)?player.softdropdelay:60);
+        pRecord[i].setHandling(player.arr, player.das, (ai[i].style == 0) ? player.softdropdelay : 60);
     }
     int key2action[] = {
         RP::moveLeft,
