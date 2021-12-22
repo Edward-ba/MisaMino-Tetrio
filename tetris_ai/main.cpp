@@ -22,6 +22,10 @@ int count = 0;
 int next = 0;
 bool done_pupu = false;
 
+#define GETPPS(t) ((t.m_drop_frame==0)?0:(double(t.n_pieces - 1) * 60.0 / t.m_drop_frame))
+#define GETAPM(t) ((t.m_drop_frame==0)?0:(double(t.total_atts) * 3600.0 / t.m_drop_frame))
+#define GETVSSCORE(t) (double(t.total_atts + t.m_clearGarbageLines) / max(1,t.n_pieces - 1) * GETPPS(t) * 100.0)
+
 PIMAGE colorCell( int w, int h, color_t normal, color_t lt, color_t rb ) {
     PIMAGE img;
     img = newimage(w, h);
@@ -286,18 +290,12 @@ void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid, i
         if ( combo > 0 ) combo--;
         //xyprintf(int(tetris.m_base.x + tetris.m_size.x * (5)), int(tetris.m_base.y + tetris.m_size.y * ( tetris.poolh() + 0 ) + 1 ),
         //    "Win %2d Att %2d Combo %d/%d/%d", tetris.n_win, tetris.total_atts, combo, tetris.m_max_combo, tetris.last_max_combo);
-        double apl = 0, app = 0, pps = 0, apm = 0;
+        double apl = 0, app = 0, pps = GETPPS(tetris), apm = GETAPM(tetris), vsscore = GETVSSCORE(tetris);
         if ( tetris.total_clears > 0 ) {
             apl = double(tetris.total_atts)/tetris.total_clears;
         }
         if ( tetris.n_pieces > 0 ) {
             app = double(tetris.total_atts)/tetris.n_pieces;
-        }
-        if ( tetris.m_drop_frame > 0 ) {
-            pps = (tetris.n_pieces - 1) * 60.0 / tetris.m_drop_frame;
-        }
-        if ( tetris.m_drop_frame > 0 ) {
-            apm = tetris.total_atts * 60.0 * 60.0 / tetris.m_drop_frame;
         }
         rectprintf(
             //int(tetris.m_base.x + tetris.m_size.x * (5+tetris.poolw())) + 1,
@@ -307,8 +305,8 @@ void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid, i
             200,
             400,
 #ifdef XP_RELEASE
-            "Win %4d\nPPS %.2f\nAPM %4.1f\nAtt %4d\nSent %3d\nRecv %3d\nAPL %.2f\nAPP %.3f\nCombo %2d\nClear %2d\nCbA %4d\nB2B %4d\nT0 %5d\nT1 %5d\nT2 %5d\nT3 %5d\n1 %6d\n2 %6d\n3 %6d\n4 %6d\n",
-            tetris.n_win, pps, apm, tetris.total_atts, tetris.total_sent, tetris.total_accept_atts, apl, app, tetris.m_max_combo,
+            "Win %4d\nPPS %.2f\nAPM %4.1f\nVS  %4.1f\nAtt %4d\nSent %3d\nRecv %3d\nAPL %.2f\nAPP %.3f\nCombo %2d\nClear %2d\nCbA %4d\nB2B %4d\nT0 %5d\nT1 %5d\nT2 %5d\nT3 %5d\n1 %6d\n2 %6d\n3 %6d\n4 %6d\n",
+            tetris.n_win, pps, apm, vsscore,tetris.total_atts, tetris.total_sent, tetris.total_accept_atts, apl, app, tetris.m_max_combo,
             tetris.m_clear_info.total_pc, tetris.m_clear_info.total_cb_att, tetris.m_clear_info.total_b2b,
             tetris.m_clear_info.t[0], tetris.m_clear_info.t[1], tetris.m_clear_info.t[2], tetris.m_clear_info.t[3],
             tetris.m_clear_info.normal[1], tetris.m_clear_info.normal[2], tetris.m_clear_info.normal[3],tetris.m_clear_info.normal[4]
@@ -672,7 +670,8 @@ void loadPlayerSetting(CProfile& config, tetris_player& player) {
     }
     if ( config.IsInteger( "softdropdas" ) ) {
         player.softdropdas = config.ReadInteger( "softdropdas" );
-        if ( player.softdropdas < 0 ) player.softdropdas = 0;
+        if ( player.softdropdas < 5 ) player.softdropdas = 0;
+        if ( player.softdropdas > 40) player.softdropdas = 40;
     }
     if ( config.IsInteger( "softdropdelay" ) ) {
         player.softdropdelay = config.ReadInteger( "softdropdelay" );
@@ -1139,7 +1138,7 @@ void mainscene() {
     std::vector<RP::playerRecord> pRecord(2);
     for (int i = 0; i < players_num; i++) {
         pRecord[i].setUSer(tetris[i].m_name,i);
-        pRecord[i].setHandling(player.arr, player.das, (ai[i].style == 0) ? player.softdropdelay : 60);
+        pRecord[i].setHandling(player.arr, player.das, (ai[i].style == 0) ? player.softdropdelay : 0);
     }
     int key2action[] = {
         RP::moveLeft,
@@ -1173,16 +1172,19 @@ void mainscene() {
                     done_pupu = true;
                     bool tf[] = { false,true };
                     double pps[2] = {
-                        (tetris[0].n_pieces - 1) * 60.0 / tetris[0].m_drop_frame,
-                        (tetris[1].n_pieces - 1) * 60.0 / tetris[1].m_drop_frame
+                        GETPPS(tetris[0]),
+                        GETPPS(tetris[1])
                     };
                     double apm[2] = {
-                        tetris[0].total_atts * 60.0 * 60.0 / tetris[0].m_drop_frame,
-                        tetris[1].total_atts * 60.0 * 60.0 / tetris[1].m_drop_frame
+                        GETAPM(tetris[0]),
+                        GETAPM(tetris[1])
                     };
-                    double vs[2];// TODO
-                    pRecord[0].setEndGameStat(tetris[0].m_frames, apm[0], pps[0], 0.0);
-                    pRecord[1].setEndGameStat(tetris[1].m_frames, apm[1], pps[1], 0.0);
+                    double vs[2] = {
+                        GETVSSCORE(tetris[0]),
+                        GETVSSCORE(tetris[1]),
+                    };// TODO
+                    pRecord[0].setEndGameStat(tetris[0].m_frames, apm[0], pps[0], vs[0]);
+                    pRecord[1].setEndGameStat(tetris[1].m_frames, apm[1], pps[1], vs[1]);
 
                     if ( tetris[1].alive() ) {
                         tetris[0].ko();
@@ -1230,7 +1232,7 @@ void mainscene() {
                     if ( k.msg == key_msg_up ) {
                         for ( int i = 0; i < 8; ++i ) {
                             if ( player_key_state[i] && (k.key == player_keys[i] ) ) {
-                                pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[i]);
+                                if (k.key == player_keys[2]) pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[2]);
                                 player_key_state[i] = 0;
                             }
                         }
@@ -1245,6 +1247,7 @@ void mainscene() {
                     if ( k.key == player_keys[0] && player_key_state[0] == 0 ) {
                         tetris[0].tryXMove(-1);
                         pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[0]);
+                        pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[0]);
                         player_key_state[0] = 1;
                         player_key_state[1] = 0;
                         //player_key_state[2] = 0;
@@ -1252,6 +1255,7 @@ void mainscene() {
                     if ( k.key == player_keys[1] && player_key_state[1] == 0 ) {
                         tetris[0].tryXMove( 1);
                         pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[1]);
+                        pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[1]);
                         player_key_state[0] = 0;
                         player_key_state[1] = 1;
                         //player_key_state[2] = 0;
@@ -1267,11 +1271,13 @@ void mainscene() {
                     if ( k.key == player_keys[3] && player_key_state[3] == 0 ) {
                         tetris[0].trySpin( 1);
                         pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[3]);
+                        pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[3]);
                         player_key_state[3] = 1;
                     }
                     if ( k.key == player_keys[4] && player_key_state[4] == 0 ) {
                         tetris[0].trySpin( 3);
                         pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[4]);
+                        pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[4]);
                         player_key_state[4] = 1;
                     }
                     if ( k.key == player_keys[5] && player_key_state[5] == 0 ) {
@@ -1282,11 +1288,13 @@ void mainscene() {
                             tetris[0].tryHold();
                         }
                         pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[5]);
+                        pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[5]);
                         player_key_state[5] = 1;
                     }
                     if ( k.key == player_keys[6] && player_key_state[6] == 0 ) {
                         tetris[0].drop();
                         pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[6]);
+                        pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[6]);
                         //player_key_state[0] = !!player_key_state[0];
                         //player_key_state[1] = !!player_key_state[1];
                         //player_key_state[2] = !!player_key_state[2];
@@ -1295,6 +1303,7 @@ void mainscene() {
                     if ( k.key == player_keys[7] && player_key_state[7] == 0 && AI::spin180Enable() ) {
                         tetris[0].trySpin180();
                         pRecord[0].insertEvent(key_msg_down, tetris[0].m_frames, &key2action[7]);
+                        pRecord[0].insertEvent(key_msg_up, tetris[0].m_frames, &key2action[7]);
                         player_key_state[7] = 1;
                     }
                     if (done_pupu == true && enable_autostart == 1) {
@@ -1319,9 +1328,9 @@ void mainscene() {
                             auto t = std::time(nullptr);
                             auto tm = *std::localtime(&t);
                             std::ostringstream oss, oss2;
-                            oss2 << tm.tm_year << tm.tm_mon << tm.tm_hour << tm.tm_min << tm.tm_sec;
+                            oss2 << tm.tm_year << "_" << tm.tm_mon+1 << "_"<< tm.tm_mday << "_" << tm.tm_hour << "_" << tm.tm_min << "_" << tm.tm_sec;
                             std::string fn = oss2.str();
-                            oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+                            oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
                             std::string str = oss.str();
                             // end of generation
                             // reset replay classes
@@ -1397,10 +1406,16 @@ void mainscene() {
                             }
                         } else if (player.arr == 0 && player_key_state[i] > player.das + 1) {
                             if (i == 0) {
-                                tetris[0].tryXXMove(-1);
+                                while (tetris[0].tryXMove(-1)) {
+                                    pRecord[0].insertEvent(RP::KEYDOWN, tetris[0].m_frames, &key2action[0]);
+                                    pRecord[0].insertEvent(RP::KEYUP, tetris[0].m_frames, &key2action[0]);
+                                }
                             }
                             else if (i == 1) {
-                                tetris[0].tryXXMove(1);
+                                while (tetris[0].tryXMove(1)) {
+                                    pRecord[0].insertEvent(RP::KEYDOWN, tetris[0].m_frames, &key2action[1]);
+                                    pRecord[0].insertEvent(RP::KEYUP, tetris[0].m_frames, &key2action[1]);
+                                }
                             }
                             else if (i == 2) {
                                 tetris[0].tryYYMove(1);

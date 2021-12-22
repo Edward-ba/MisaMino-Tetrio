@@ -102,6 +102,7 @@ namespace AI {
             m_cur_y = AI::gem_beg_y;
             m_curnum = 0;
             m_clearLines = 0;
+            m_clearGarbageLines = 0;
             m_attack = 0;
             m_max_combo = 0;
             m_frames = 0;
@@ -230,9 +231,13 @@ namespace AI {
             int dy = 63;
             for ( int y = dy; y >= 0; --y ) {
                 int x = 0;
+                bool garbageLine = false;
                 for ( ; x < poolw(); ++x ) {
+                    garbageLine |= (m_color_pool[y][x] == 8);
                     if ( m_color_pool[y][x] == 0 ) break;
                 }
+                bool lineClear = !(x < poolw());
+                m_clearGarbageLines += (garbageLine && lineClear) ? 1 : 0;
                 if ( x < poolw() ) {
                     if ( dy != y ) {
                         for (x = 0 ; x < poolw(); ++x ) {
@@ -446,6 +451,7 @@ namespace AI {
         int m_next_num;
         point m_base, m_size;
         int m_clearLines;
+        int m_clearGarbageLines;
         int m_attack;
         int m_max_combo;
         int m_frames;

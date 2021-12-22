@@ -97,7 +97,7 @@ namespace RP {
 				{"arr",arr},
 				{"das",das},
 				{"dcd",0},
-				{"sdf",sdf * 2},
+				{"sdf",(sdf == 0)?60:double(200)/sdf},
 				{"safelock",true},
 				{"cancel",true}
 			};
