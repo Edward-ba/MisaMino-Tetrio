@@ -150,7 +150,7 @@ namespace RP {
 				{"nextcount",5},
 				{"allow_harddrop",true},
 				{"display_shadow",true},
-				{"locktime",30},
+				{"locktime",99999},
 				{"garbagespeed",1},
 				{"forfeit_time",150},
 				{"are",0},
