@@ -223,8 +223,17 @@ namespace AI {
             m_pool.paste( m_cur_x, m_cur_y, m_cur );
             paste();
             m_drop_frame = m_frames;
-            m_cur = AI::getGem( 0, 0);
             m_state = STATE_PASTED;
+            // in tetrio, if dropped piece is all above 20 height, the game end.
+            if (TETRIO_ATTACK_TABLE) {
+                int low = 0; // tetrimino's lowest position, how much lower than m_cur_y
+                // m_cur_y is the spin pivot, which is at bitmap[1], so if bitmap[2] not zero >>> at least 1 lower than pivot
+                for (int i = 2; i < 4; i++) {
+                    if (m_cur.bitmap[i]) low = i-1;
+                }
+                if (m_cur_y + low <= 1) m_state = STATE_OVER;
+            }
+            m_cur = AI::getGem(0, 0);
             return true;
         }
         void color_pool_clearLines() {
