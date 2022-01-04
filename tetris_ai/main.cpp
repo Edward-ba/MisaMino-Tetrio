@@ -1136,6 +1136,7 @@ void mainscene() {
     rp.setUser(tetris[0].m_name, tetris[1].m_name);
     RP::GameRecord gRecord;
     std::vector<RP::playerRecord> pRecord(2);
+    bool gameExported = false;
     for (int i = 0; i < players_num; i++) {
         pRecord[i].setUSer(tetris[i].m_name,i);
         pRecord[i].setHandling(player.arr, player.das, (ai[i].style == 0) ? player.softdropdelay : 0);
@@ -1325,6 +1326,7 @@ void mainscene() {
                     if ( k.key == key_f2 ) {
                         if ( !tetris[0].alive() || !tetris[1].alive() || tetris[0].n_pieces <= 20 ) {
                             // generate filename and timestamp
+                            gameExported = false;
                             auto t = std::time(nullptr);
                             auto tm = *std::localtime(&t);
                             std::ostringstream oss, oss2;
@@ -1362,9 +1364,13 @@ void mainscene() {
                     }
                     // output replay
                     if (k.key == key_f11 && lastGameState == -1) {
-                        gRecord.insertGame(pRecord[0]);
-                        gRecord.insertGame(pRecord[1]);
-                        rp.insertGame(gRecord);
+                        if (!gameExported) {
+                            gRecord.reset();
+                            gRecord.insertGame(pRecord[0]);
+                            gRecord.insertGame(pRecord[1]);
+                            rp.insertGame(gRecord);
+                            gameExported = true;
+                        }
                         rp.toFile();
                     }
                     if ( k.key == key_f12 ) {

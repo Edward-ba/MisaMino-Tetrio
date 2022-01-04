@@ -311,8 +311,8 @@ namespace RP {
 		}
 		void reset(){
 			game.clear();
-			game["board"] = json::array();
-			game["replays"] = json::array();
+			game["board"].clear();
+			game["replays"].clear();
 		}
 		json getGame() {
 			return game;
