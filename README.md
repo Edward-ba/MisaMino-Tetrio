@@ -6,8 +6,11 @@ MisaMino with more features. Tetrio attack table is on by default, others need t
 4. Undo (backspace)
 5. Generate .ttrm replay file which can be played on Tetrio! (F11)
 
-Notice that enable delayed attack, turn-based, and undo all at the same time does not make sense, so something bizarre might happen.<br>
-Notice2: Once you generate replay file, you cannot undo an already finished game.
+<b>Notice:</b> That enable delayed attack, turn-based, and undo all at the same time does not make sense, so something bizarre might happen.<br>
+<b>Notice2:</b> Once you generate replay file, you cannot undo an already finished game.
+
+Future todos:<br>
+passthrough(?
 
 Download link: 
 You can find the link in the release page
