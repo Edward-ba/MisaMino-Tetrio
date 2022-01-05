@@ -1718,8 +1718,6 @@ void mainscene() {
                                 pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
                                 // need to keep pressing sd for at least 1 frame
                                 pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[2], subframe);
-                                // incase still more movement in this frame.
-                                break;
                             }
                             else if (mov == AI::Moving::MOV_DROP) {
                                 tetris[i].drop();
