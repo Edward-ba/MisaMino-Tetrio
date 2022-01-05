@@ -4,7 +4,7 @@
 #include "json.hpp"
 #include "tetrisgame.h"
 #include <string>
-#include <vector>
+#include <list>
 #include <fstream>
 
 namespace RP {
@@ -55,6 +55,10 @@ namespace RP {
 		int frame;
 		double subframe;
 	} frame_t;
+	typedef struct {
+		std::list<json> evts;
+		bool done;
+	} step_t;
 	class playerRecord
 	{
 		int cid = 0;
@@ -66,6 +70,8 @@ namespace RP {
 		json options;
 		json endGameStat;
 		int totalFrames;
+		int undoSteps;
+		std::list<step_t> temp_evt;
 	public:
 		playerRecord() {
 			info = {
@@ -79,8 +85,10 @@ namespace RP {
 			for (int i = 0; i < 40; i++) {
 				board.push_back(row);
 			}
+			undoSteps = 0;
 		}
-		void reset() {
+		void reset(int undo) {
+			undoSteps = undo;
 			evt.clear();
 			options.clear();
 			endGameStat.clear();
@@ -182,6 +190,101 @@ namespace RP {
 					{"other","tetrio"},
 				}}
 			};
+		}
+		void insertStartEvent() {
+
+		}
+		void queueCheck() {
+			int totalStoredSteps = 0;
+			for (auto it = temp_evt.begin(); it != temp_evt.end(); it++) {
+				if (it->done) totalStoredSteps++;
+			}
+			int excessSteps = max(0, totalStoredSteps - undoSteps);
+			while (excessSteps--) {
+				for (auto it = temp_evt.front().evts.begin(); it != temp_evt.front().evts.end(); it++) {
+					this->evt["events"].push_back(*it);
+				}
+				temp_evt.pop_front();
+			}
+		}
+		void flush() {
+			while (!temp_evt.empty()) {
+				for (auto it = temp_evt.front().evts.begin(); it != temp_evt.front().evts.end(); it++) {
+					this->evt["events"].push_back(*it);
+				}
+				temp_evt.pop_front();
+			}
+		}
+		void amendIGEEvt(atk_t atk) {
+			step_t last;
+			bool lastExist = false;
+			if (!temp_evt.back().done) {
+				last = temp_evt.back();
+				temp_evt.pop_back();
+				lastExist = true;
+			}
+			json ige;
+			int frame = temp_evt.back().evts.back()["frame"];
+			ige["frame"] = frame;
+			ige["type"] = "ige";
+			ige["data"] = {
+				{"type","ige"},
+				{"data",{
+					{"type","interaction"},
+					{"sent_frame", frame - 1},
+					{"cid",++cid},
+					{"data",{
+						{"type","garbage"},
+						{"amt",atk.atk},
+						{"x",0},{"y",0},
+						{"column",atk.pos}
+						}
+					}
+					}
+				},
+				{"frame",frame},
+				{"id",++id}
+			};
+			json ige_c;
+			ige_c["frame"] = frame;
+			ige_c["type"] = "ige";
+			ige_c["data"] = {
+				{"type","ige"},
+				{"data",{
+					{"type","interaction_confirm"},
+					{"sent_frame", frame - 1},
+					{"cid",cid},
+					{"data",{
+						{"type","garbage"},
+						{"amt",atk.atk},
+						{"x",0},{"y",0},
+						{"column",atk.pos}
+						}
+					}
+					}
+				},
+				{"frame",frame},
+				{"id",++id}
+			};
+			temp_evt.back().evts.push_back(ige);
+			temp_evt.back().evts.push_back(ige_c);
+			if (lastExist) {
+				temp_evt.push_back(last);
+			}
+		}
+		void markEndofStep() {
+			temp_evt.back().done = true;
+		}
+		void insertTmpEvent(json evt) {
+			if (temp_evt.empty() || temp_evt.back().done) {
+				temp_evt.push_back({});
+				temp_evt.back().done = false;
+			}
+			temp_evt.back().evts.push_back(evt);
+		}
+		void undo() {
+			if (!temp_evt.back().done) temp_evt.pop_back();
+			temp_evt.pop_back();
 		}
 		void insertEvent(int evt, int frame, void* param, double subframe = 0.0) {
 			json event;
@@ -285,7 +388,12 @@ namespace RP {
 			default:
 				break;
 			}
-			this->evt["events"].push_back(event);
+			if (evt == FULL || evt == START || evt == TARGETS || evt == END) {
+				this->evt["events"].push_back(event);
+			}
+			else {
+				insertTmpEvent(event);
+			}
 			if (evt == IGE) {
 				insertEvent(IGE_C, frame, param);
 			}
