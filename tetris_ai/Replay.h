@@ -88,6 +88,7 @@ namespace RP {
 			undoSteps = 0;
 		}
 		void reset(int undo) {
+			temp_evt.clear();
 			undoSteps = undo;
 			evt.clear();
 			options.clear();
