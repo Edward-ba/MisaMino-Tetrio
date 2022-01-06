@@ -386,10 +386,11 @@ void tetris_draw(const TetrisGame& tetris, bool showAttackLine, bool showGrid, i
         }
     }
     {
-        int w = textwidth(tetris.m_name.c_str());
+        std::string f = tetris.m_name;// +" " + std::to_string(tetris.m_frames);
+        int w = textwidth(f.c_str());
         if ( tetris.pTetrisAI ) setcolor(EGERGB(0xa0, 0x0, 0xff));
         xyprintf(int(tetris.m_base.x + tetris.m_size.x * ( 5 + tetris.poolw() / 2 )) - w / 2, int(tetris.m_base.y + tetris.m_size.y * 0 ),
-            "%s", tetris.m_name.c_str() );
+            "%s", f.c_str() );
     }
 }
 
@@ -1455,7 +1456,7 @@ void mainscene() {
                             if (atk.attacker == j) continue;
                             if (rule.GarbageBuffer) {
                                 tetris[j].accept_atts.push_back(atk.attack);
-                                pRecord[j].insertEvent(RP::IGE, tetris[j].m_frames, &atk);
+                                pRecord[j].insertEvent(RP::IGE, tetris[j].m_frames, &(atk.attack));
                                 if (rule.turnbase) tetris[j].env_change = 2; // don't know what it means
                             }
                             else {
@@ -1523,7 +1524,7 @@ void mainscene() {
                                         tetris[j].accept_atts.push_back(tetris[i].genAttack(att));
                                         if (j == 0 && saved_board[j].back().n_pieces == tetris[j].n_pieces) {
                                             saved_board[j].back().accept_atts = tetris[j].accept_atts;
-                                            pRecord[j].amendIGEEvt(tetris[j].accept_atts.back());
+                                            pRecord[j].amendIGEEvt(tetris[j].m_frames, tetris[j].accept_atts.back());
                                         }
                                         else {
                                             pRecord[j].insertEvent(RP::IGE, tetris[j].m_frames, &tetris[j].accept_atts.back());
@@ -1777,6 +1778,7 @@ void mainscene() {
                 while (tetris[1].ai_movs_flag != -1) ::Sleep(1);
                 tetris[1] = saved_board[1].back();
             }
+            tetris[1].m_frames = tetris[0].m_frames;
         }
         for (int i = 0; i < players_num; i++) {
                 tetris_draw(tetris[i], showAttackLine, showGrid, rule.GarbageCap);

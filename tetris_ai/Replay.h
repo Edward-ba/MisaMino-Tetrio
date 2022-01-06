@@ -72,6 +72,7 @@ namespace RP {
 		int totalFrames;
 		int undoSteps;
 		std::list<step_t> temp_evt;
+		std::list<json> ige_reorder;
 	public:
 		playerRecord() {
 			info = {
@@ -89,6 +90,7 @@ namespace RP {
 		}
 		void reset(int undo) {
 			temp_evt.clear();
+			ige_reorder.clear();
 			undoSteps = undo;
 			evt.clear();
 			options.clear();
@@ -164,7 +166,7 @@ namespace RP {
 				{"forfeit_time",150},
 				{"are",0},
 				{"lineclear_are",0},
-				{"infinitemovement",false},
+				{"infinitemovement",true},
 				{"lockresets",15},
 				{"allow180",true},
 				{"manual_allowed",false},
@@ -202,21 +204,33 @@ namespace RP {
 			}
 			int excessSteps = max(0, totalStoredSteps - undoSteps);
 			while (excessSteps--) {
-				for (auto it = temp_evt.front().evts.begin(); it != temp_evt.front().evts.end(); it++) {
-					this->evt["events"].push_back(*it);
-				}
-				temp_evt.pop_front();
+				flushOneStep();
 			}
+		}
+		void flushOneStep() {
+			for (auto it = temp_evt.front().evts.begin(); it != temp_evt.front().evts.end(); it++) {
+				if ((*it)["type"] == "ige") {
+					ige_reorder.push_back(*it);
+					continue;
+				}
+				while (!ige_reorder.empty() && ige_reorder.front()["frame"] < (*it)["frame"]) {
+					this->evt["events"].push_back(ige_reorder.front());
+					ige_reorder.pop_front();
+				}
+				this->evt["events"].push_back(*it);
+			}
+			temp_evt.pop_front();
 		}
 		void flush() {
 			while (!temp_evt.empty()) {
-				for (auto it = temp_evt.front().evts.begin(); it != temp_evt.front().evts.end(); it++) {
-					this->evt["events"].push_back(*it);
-				}
-				temp_evt.pop_front();
+				flushOneStep();
+			}
+			while (!ige_reorder.empty()) {
+				this->evt["events"].push_back(ige_reorder.front());
+				ige_reorder.pop_front();
 			}
 		}
-		void amendIGEEvt(atk_t atk) {
+		void amendIGEEvt(int frame, atk_t atk) {
 			step_t last;
 			bool lastExist = false;
 			if (!temp_evt.back().done) {
@@ -225,7 +239,7 @@ namespace RP {
 				lastExist = true;
 			}
 			json ige;
-			int frame = temp_evt.back().evts.back()["frame"];
+			//frame = temp_evt.back().evts.back()["frame"];
 			ige["frame"] = frame;
 			ige["type"] = "ige";
 			ige["data"] = {
