@@ -25,6 +25,7 @@ bool done_pupu = false;
 #define GETPPS(t) ((t.m_drop_frame==0)?0:(double(t.n_pieces - 1) * 60.0 / t.m_drop_frame))
 #define GETAPM(t) ((t.m_drop_frame==0)?0:(double(t.total_atts) * 3600.0 / t.m_drop_frame))
 #define GETVSSCORE(t) (double(t.total_atts + t.m_clearGarbageLines) / max(1,t.n_pieces - 1) * GETPPS(t) * 100.0)
+#define UNDO_AVAILABLE (rule.turnbase && rule.undoSteps > 0 && ai[0].style == 0)
 
 PIMAGE colorCell( int w, int h, color_t normal, color_t lt, color_t rb ) {
     PIMAGE img;
@@ -1138,6 +1139,8 @@ void mainscene() {
     RP::GameRecord gRecord;
     std::vector<RP::playerRecord> pRecord(2);
     bool gameExported = false;
+    bool softDrop[2] = { false };
+    int garbageReady = 1;
     for (int i = 0; i < players_num; i++) {
         pRecord[i].setUSer(tetris[i].m_name,i);
         pRecord[i].setHandling(player.arr, player.das, (ai[i].style == 0) ? player.softdropdelay : 0);
@@ -1315,8 +1318,8 @@ void mainscene() {
                             // reset replay classes
                             rp.reset(fn, str);
                             gRecord.reset();
-                            pRecord[0].reset(rule.undoSteps);
-                            pRecord[1].reset(rule.undoSteps+10);
+                            pRecord[0].reset(UNDO_AVAILABLE?rule.undoSteps:0);
+                            pRecord[1].reset(UNDO_AVAILABLE ? rule.undoSteps+10 : 0);
                             //
                             int seed = (unsigned)time(0), pass = rnd.randint(1024);
                             delayed_attack_q.clear();
@@ -1357,19 +1360,19 @@ void mainscene() {
                                 GETVSSCORE(tetris[0]),
                                 GETVSSCORE(tetris[1]),
                             };
-                            pRecord[0].setEndGameStat(tetris[0].m_drop_frame, apm[0], pps[0], vs[0]);
-                            pRecord[1].setEndGameStat(tetris[1].m_drop_frame, apm[1], pps[1], vs[1]);
+                            pRecord[0].setEndGameStat(tetris[0].m_drop_frame+1, apm[0], pps[0], vs[0]);
+                            pRecord[1].setEndGameStat(tetris[1].m_drop_frame+1, apm[1], pps[1], vs[1]);
                             if (tetris[1].alive()) {
                                 pRecord[0].setWin(false);
                                 pRecord[1].setWin(true);
-                                pRecord[0].insertEvent(RP::END, tetris[0].m_drop_frame, tf);
-                                pRecord[1].insertEvent(RP::END, tetris[1].m_drop_frame, &tf[1]);
+                                pRecord[0].insertEvent(RP::END, tetris[0].m_drop_frame+1, tf);
+                                pRecord[1].insertEvent(RP::END, tetris[1].m_drop_frame+1, &tf[1]);
                             }
                             else {
                                 pRecord[1].setWin(false);
                                 pRecord[0].setWin(true);
-                                pRecord[1].insertEvent(RP::END, tetris[1].m_drop_frame, tf);
-                                pRecord[0].insertEvent(RP::END, tetris[0].m_drop_frame, &tf[1]);
+                                pRecord[1].insertEvent(RP::END, tetris[1].m_drop_frame+1, tf);
+                                pRecord[0].insertEvent(RP::END, tetris[0].m_drop_frame+1, &tf[1]);
                             }
                             gRecord.reset();
                             gRecord.insertGame(pRecord[0]);
@@ -1402,6 +1405,7 @@ void mainscene() {
                     if ( PUBLIC_VERSION == 0 ) {
                         if ( k.key == key_f9 ) {
                             tetris[1].accept_atts.push_back(tetris[1].genAttack(1));
+                            tetris[1].accept_atts_frame.push_back(tetris[1].m_frames);
                         }
                     }
                 }
@@ -1445,6 +1449,8 @@ void mainscene() {
                     }
                 }
             }
+            atk_t atkCurFrame;
+            int atkRecver = -1;
             for ( int i = 0; i < players_num; ++i ) {
                 // before any player move handle delayed attack first
                 if (DELAYED_ATTACK && rule.DelayedAttackTime != 0) {
@@ -1456,6 +1462,7 @@ void mainscene() {
                             if (atk.attacker == j) continue;
                             if (rule.GarbageBuffer) {
                                 tetris[j].accept_atts.push_back(atk.attack);
+                                tetris[j].accept_atts_frame.push_back(tetris[i].m_frames);
                                 pRecord[j].insertEvent(RP::IGE, tetris[j].m_frames, &(atk.attack));
                                 if (rule.turnbase) tetris[j].env_change = 2; // don't know what it means
                             }
@@ -1471,6 +1478,11 @@ void mainscene() {
                 if ( tetris[i].game() ) { // 游戏执行，如果丢下返回true
                     tetris[i].env_change = 1;
                     tetris[i].n_pieces += 1;
+
+                    if (softDrop[i]) {
+                        pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames, &key2action[2]);
+                        softDrop[i] = false;
+                    }
 
                     int att = tetris[i].m_attack;
                     int clearLines = tetris[i].m_clearLines;
@@ -1495,8 +1507,13 @@ void mainscene() {
                                 int m = min( att, tetris[i].accept_atts[0].atk);
                                 att -= m;
                                 tetris[i].accept_atts[0].atk -= m;
+                                // cancel atk in the same frame for replay file
+                                if (atkRecver == i && tetris[i].accept_atts_frame.front() == tetris[i].m_frames) {
+                                    atkCurFrame.atk -= m;
+                                }
                                 if ( tetris[i].accept_atts[0].atk <= 0 ) {
                                     tetris[i].accept_atts.erase( tetris[i].accept_atts.begin() );
+                                    tetris[i].accept_atts_frame.erase(tetris[i].accept_atts_frame.begin());
                                 }
                             }
                             // second cancel delayed attack
@@ -1522,12 +1539,12 @@ void mainscene() {
                                     if (i == j) continue;
                                     if (rule.GarbageBuffer) {
                                         tetris[j].accept_atts.push_back(tetris[i].genAttack(att));
-                                        if (j == 0 && saved_board[j].back().n_pieces == tetris[j].n_pieces) {
+                                        tetris[j].accept_atts_frame.push_back(tetris[i].m_frames);
+                                        atkCurFrame = tetris[j].accept_atts.back();
+                                        atkRecver = j;
+                                        if (UNDO_AVAILABLE && j == 0 && saved_board[j].back().n_pieces == tetris[j].n_pieces) {
                                             saved_board[j].back().accept_atts = tetris[j].accept_atts;
-                                            pRecord[j].amendIGEEvt(tetris[j].m_frames, tetris[j].accept_atts.back());
-                                        }
-                                        else {
-                                            pRecord[j].insertEvent(RP::IGE, tetris[j].m_frames, &tetris[j].accept_atts.back());
+                                            saved_board[j].back().accept_atts_frame = tetris[j].accept_atts_frame;
                                         }
                                         tetris[i].total_sent += att;
                                         if (rule.turnbase) tetris[j].env_change = 2;
@@ -1544,7 +1561,7 @@ void mainscene() {
 
                     if ( player_accept_attack && ( rule.GarbageBlocking == 0 || clearLines == 0) ) {
                         int cap = (rule.GarbageCap == 0)?-1:rule.GarbageCap;
-                        while ( ! tetris[i].accept_atts.empty() ) {
+                        while ( ! tetris[i].accept_atts.empty() && tetris[i].accept_atts_frame.front() + garbageReady <= tetris[i].m_frames) {
                             if (cap == 0) break;
                             if (TETRIO_ATTACK_TABLE && cap != -1) {
                                 if (cap < tetris[i].accept_atts.front().atk) {
@@ -1571,15 +1588,16 @@ void mainscene() {
                                 }
                             }
                             tetris[i].accept_atts.erase( tetris[i].accept_atts.begin() );
+                            tetris[i].accept_atts_frame.erase(tetris[i].accept_atts_frame.begin());
                         }
                     }
                 }
                 // Have to record state before ai start to calculate
-                if (tetris[i].n_pieces > saved_board[i].back().n_pieces) {
+                if (UNDO_AVAILABLE && tetris[i].n_pieces > saved_board[i].back().n_pieces) {
                     while (saved_board[i].size() > saved_board_num[i])
                         saved_board[i].pop_front();
                     saved_board[i].push_back(tetris[i]);
-                    pRecord[i].markEndofStep();
+                    pRecord[i].commitStep();
                     pRecord[i].queueCheck();
                 }
                 if ( tetris[i].env_change && tetris[i].ai_movs_flag == -1) { // AI 计算
@@ -1636,6 +1654,14 @@ void mainscene() {
                         }
                     }
                     tetris[i].env_change = 0;
+                }
+            }
+            if (atkRecver != -1 && atkCurFrame.atk > 0) {
+                if (UNDO_AVAILABLE && atkRecver == 0 && saved_board[atkRecver].back().n_pieces == tetris[atkRecver].n_pieces) {
+                    pRecord[atkRecver].amendIGEEvt(tetris[atkRecver].m_frames, atkCurFrame);
+                }
+                else {
+                    pRecord[atkRecver].insertEvent(RP::IGE, tetris[atkRecver].m_frames, &atkCurFrame);
                 }
             }
             for ( int i = 0; i < players_num; ++i ) { // 100 garbage buffer get lost
@@ -1698,7 +1724,8 @@ void mainscene() {
                             else if (mov == AI::Moving::MOV_D) { // better not use, replay will be strange
                                 tetris[i].tryYMove(1);
                                 pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
-                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[2], subframe += smalldiff);
+                                softDrop[i] = true;
+                                break;
                             }
                             else if (mov == AI::Moving::MOV_LSPIN) {
                                 tetris[i].trySpin(1);
@@ -1727,14 +1754,16 @@ void mainscene() {
                             else if (mov == AI::Moving::MOV_DD) {
                                 tetris[i].tryYYMove(1);
                                 pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames, &key2action[2], subframe += smalldiff);
-                                // need to keep pressing sd for at least 1 frame
-                                pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[2], subframe);
+                                // need to keep pressing sd for at least 1 frame, insert event in next frame
+                                // pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[2], subframe);
+                                softDrop[i] = true;
                                 // incase still more movement in this frame.
                                 break;
                             }
                             else if (mov == AI::Moving::MOV_DROP) {
                                 tetris[i].drop();
                                 // hd will drop immediately, better move to next frame
+                                //hardDrop[i] = true;
                                 pRecord[i].insertEvent(RP::KEYDOWN, tetris[i].m_frames+1, &key2action[6], subframe += smalldiff);
                                 pRecord[i].insertEvent(RP::KEYUP, tetris[i].m_frames+1, &key2action[6], subframe += smalldiff);
                             }
@@ -1764,7 +1793,7 @@ void mainscene() {
         }
         cleardevice();
         // undo
-        if (undo && saved_board[0].size() > 1 && rule.turnbase && rule.undoSteps > 0) {
+        if (UNDO_AVAILABLE && undo && saved_board[0].size() > 1) {
             lastGameState = 0;
             saved_board[0].pop_back();
             pRecord[0].undo();

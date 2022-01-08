@@ -130,6 +130,7 @@ public:
         ai_last_deep = 0;
         ai_movs_flag = -1;
         accept_atts.clear();
+        accept_atts_frame.clear();
         m_last_hole_x = -1;
         total_clears = 0;
         total_atts = 0;
@@ -344,6 +345,7 @@ public:
     int env_change;
     int n_pieces;
     std::vector<atk_t> accept_atts;
+    std::vector<int> accept_atts_frame;
     int m_last_hole_x;
     int n_win;
     int total_clears;

@@ -213,7 +213,7 @@ namespace RP {
 					ige_reorder.push_back(*it);
 					continue;
 				}
-				while (!ige_reorder.empty() && ige_reorder.front()["frame"] < (*it)["frame"]) {
+				while (!ige_reorder.empty() && ige_reorder.front()["frame"] <= (*it)["frame"]) {
 					this->evt["events"].push_back(ige_reorder.front());
 					ige_reorder.pop_front();
 				}
@@ -287,7 +287,7 @@ namespace RP {
 				temp_evt.push_back(last);
 			}
 		}
-		void markEndofStep() {
+		void commitStep() {
 			temp_evt.back().done = true;
 		}
 		void insertTmpEvent(json evt) {
@@ -403,7 +403,7 @@ namespace RP {
 			default:
 				break;
 			}
-			if (evt == FULL || evt == START || evt == TARGETS || evt == END) {
+			if (undoSteps == 0 || (evt == FULL || evt == START || evt == TARGETS || evt == END)) {
 				this->evt["events"].push_back(event);
 			}
 			else {
