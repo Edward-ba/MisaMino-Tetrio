@@ -1,3 +1,4 @@
+issues or anything else goes [here](https://gist.github.com/chouhy/058e872208d9b143cbc7ad03a8ca52cd)
 # MisaMino-Tetrio
 MisaMino with more features. Tetrio attack table is on by default, others need to be set in the setting.ini.
 1. Tetrio attack table. (Check [here](https://chouhy.github.io/Tetrio-Attack-Table/) for detail)
