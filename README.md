@@ -16,3 +16,7 @@ passthrough(?
 Download link: 
 You can find the link in the release page
 https://github.com/chouhy/MisaMino-Tetrio/releases
+
+Library:
+Json for C++
+https://github.com/nlohmann/json
