@@ -225,7 +225,7 @@ namespace AI {
             m_drop_frame = m_frames;
             m_state = STATE_PASTED;
             // in tetrio, if dropped piece is all above 20 height, the game end.
-            if (TETRIO_ATTACK_TABLE) {
+            if (TETRIO_ATTACK_TABLE && AI::isLockOutEnable()) {
                 int low = 0; // tetrimino's lowest position, how much lower than m_cur_y
                 // m_cur_y is the spin pivot, which is at bitmap[1], so if bitmap[2] not zero >>> at least 1 lower than pivot
                 for (int i = 2; i < 4; i++) {
