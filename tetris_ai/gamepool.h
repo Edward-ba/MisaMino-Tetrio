@@ -19,6 +19,8 @@ namespace AI {
     int getComboAttack( int combo );
     void setAllSpin(bool allSpin);
     bool isEnableAllSpin();
+    void setLockOut(bool enable);
+    bool isLockOutEnable();
     void setSoftdrop( bool softdrop );
     bool softdropEnable();
     typedef __int64 uint64;

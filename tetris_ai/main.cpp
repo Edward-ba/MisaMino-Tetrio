@@ -548,6 +548,7 @@ struct tetris_rule {
     int DelayedAttackTime;
     int undoSteps;
     int combo_table_style;
+    int lockout;
     int samesequence;
     int turn;
     tetris_rule() {
@@ -562,6 +563,7 @@ struct tetris_rule {
         DelayedAttackTime = 0;
         undoSteps = 0;
         combo_table_style = 0;
+        lockout = 0;
         samesequence = 1;
         turn = 1;
     }
@@ -652,6 +654,10 @@ void loadRule(CProfile& config, tetris_rule& rule) {
     }
     if ( config.IsInteger( "samesequence" ) ) {
         rule.samesequence = config.ReadInteger( "samesequence" );
+    }
+    if ( config.IsInteger( "lockout" ) ) {
+        rule.lockout = config.ReadInteger( "lockout" );
+        AI::setLockOut(rule.lockout);
     }
     if ( config.IsInteger( "combo_table_style" ) ) {
         rule.combo_table_style = config.ReadInteger( "combo_table_style" );
