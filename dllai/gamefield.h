@@ -17,7 +17,7 @@ namespace AI {
     struct GameField {
         signed char m_w, m_h;
         signed short combo;
-        signed short b2b;
+        signed int b2b;
         unsigned long m_w_mask;
         unsigned long m_row[AI_POOL_MAX_H];
         int m_hold;
